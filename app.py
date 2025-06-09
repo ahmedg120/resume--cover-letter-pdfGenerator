@@ -5,11 +5,8 @@ import os
 import tempfile
 import json
 import subprocess
-import shutil
-import platform
 from groq import Groq
 from werkzeug.utils import secure_filename
-import io
 
 app = Flask(__name__)
 UPLOAD_FOLDER = tempfile.mkdtemp()
@@ -133,7 +130,6 @@ Resume text:
 {resume_text}
 """
 
-
         response = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": prompt}],
@@ -143,52 +139,26 @@ Resume text:
 
         json_resume = json.loads(response.choices[0].message.content)
 
-        # Create a temporary directory
-        tempdir = tempfile.mkdtemp()
-        resume_json_path = os.path.join(tempdir, "resume.json")
-        output_pdf_path = os.path.join(tempdir, "resume.pdf")
+        # Step 4: Generate PDF with `npx resume export`
+        with tempfile.TemporaryDirectory() as tempdir:
+            resume_json_path = os.path.join(tempdir, "resume.json")
+            with open(resume_json_path, "w") as f:
+                json.dump(json_resume, f, indent=2)
 
-        with open(resume_json_path, "w") as f:
-            json.dump(json_resume, f, indent=2)
+            output_pdf_path = os.path.join(tempdir, "resume.pdf")
 
-        npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
+            subprocess.run([
+                "C:\\Program Files\\nodejs\\npx.cmd", "resume", "export", output_pdf_path,
+                "--resume", resume_json_path,
+                "--theme", "jsonresume-theme-stackoverflow"
+            ], check=True)
 
-        # Export resume to PDF
-        result = subprocess.run([
-            npx_cmd, "resume", "export", output_pdf_path,
-            "--resume", resume_json_path,
-            "--theme", "jsonresume-theme-stackoverflow"
-        ], capture_output=True, text=True)
+            return send_file(output_pdf_path, as_attachment=True)
 
-        if result.returncode != 0:
-            raise RuntimeError(f"resume-cli failed: {result.stderr}")
-
-        if not os.path.exists(output_pdf_path):
-            raise FileNotFoundError("PDF was not created.")
-
-        # Return PDF
-        with open(output_pdf_path, 'rb') as f:
-            pdf_data = f.read()
-        pdf_io = io.BytesIO(pdf_data)
-        pdf_io.seek(0)
-
-        return send_file(
-            pdf_io,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name='resume.pdf'
-        )
-
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        try:
-            shutil.rmtree(app.config['UPLOAD_FOLDER'], ignore_errors=True)
-            if 'tempdir' in locals():
-                shutil.rmtree(tempdir, ignore_errors=True)
-        except Exception as e:
-            print(f"Error cleaning up temp files: {e}")
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
