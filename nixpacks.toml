@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ['nodejs', 'python311', 'gcc', 'python311Packages.pip']
+
+[phases.install]
+cmds = [
+  'python -m pip install --upgrade pip',
+  'python -m pip install -r requirements.txt',
+  'npm install -g resume-cli jsonresume-theme-stackoverflow'
+]
+
+[start]
+cmd = "python app.py"
