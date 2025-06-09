@@ -9,6 +9,7 @@ import shutil
 import platform
 from groq import Groq
 from werkzeug.utils import secure_filename
+import io
 
 app = Flask(__name__)
 UPLOAD_FOLDER = tempfile.mkdtemp()
@@ -159,11 +160,23 @@ Resume text:
                 "--theme", "jsonresume-theme-stackoverflow"
             ], check=True)
 
-            # Copy PDF to persistent path before sending
-            final_pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "final_resume.pdf")
-            shutil.copy(output_pdf_path, final_pdf_path)
+            # Read the PDF file into memory
+            with open(output_pdf_path, 'rb') as pdf_file:
+                pdf_data = pdf_file.read()
 
-        return send_file(final_pdf_path, as_attachment=True)
+            # Clean up the temporary directory
+            shutil.rmtree(tempdir)
+
+        # Create a BytesIO object to send the PDF
+        pdf_io = io.BytesIO(pdf_data)
+        pdf_io.seek(0)
+
+        return send_file(
+            pdf_io,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='resume.pdf'
+        )
 
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
