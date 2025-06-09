@@ -142,44 +142,58 @@ Resume text:
 
         json_resume = json.loads(response.choices[0].message.content)
 
-        # Step 4: Generate PDF with `npx resume export`
+        # Step 4: Generate PDF with `resume export`
         tempdir = tempfile.mkdtemp()
         try:
+            print("=== Starting PDF Generation Process ===")
             print(f"Created temporary directory: {tempdir}")
             
             resume_json_path = os.path.join(tempdir, "resume.json")
             with open(resume_json_path, "w") as f:
                 json.dump(json_resume, f, indent=2)
             print(f"Created JSON file at: {resume_json_path}")
+            print(f"JSON file contents: {json.dumps(json_resume, indent=2)}")
 
             output_pdf_path = os.path.join(tempdir, "resume.pdf")
             print(f"Will save PDF to: {output_pdf_path}")
 
             # Change to the app directory where node_modules is located
-            os.chdir(os.path.dirname(os.path.abspath(__file__)))
-            print(f"Changed to directory: {os.getcwd()}")
-
-            # Use npx directly
-            npx_cmd = "npx"
-            if platform.system() == "Windows":
-                npx_cmd = "npx.cmd"
-
-            print(f"Using npx command: {npx_cmd}")
-            print(f"Directory contents: {os.listdir('.')}")
+            original_dir = os.getcwd()
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            os.chdir(app_dir)
+            print(f"Changed directory from {original_dir} to {app_dir}")
+            print(f"Current directory contents: {os.listdir('.')}")
             print(f"node_modules exists: {os.path.exists('node_modules')}")
+            if os.path.exists('node_modules'):
+                print(f"node_modules contents: {os.listdir('node_modules')}")
 
-            # Run the resume-cli command
-            result = subprocess.run([
-                npx_cmd, "resume-cli", "export", output_pdf_path,
-                "--resume", resume_json_path,
-                "--theme", "jsonresume-theme-stackoverflow"
-            ], capture_output=True, text=True, check=True)
-            
-            print(f"resume-cli output: {result.stdout}")
-            print(f"resume-cli errors: {result.stderr}")
+            # Use npx to run resume directly
+            cmd = ["npx", "resume", "export", output_pdf_path, "--theme", "stackoverflow"]
+            print(f"Running command: {' '.join(cmd)}")
+            print(f"Current working directory: {os.getcwd()}")
+
+            # Run the command
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=os.getcwd(),
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                print(f"Command completed successfully")
+                print(f"Command output: {result.stdout}")
+                print(f"Command errors: {result.stderr}")
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with exit code {e.returncode}")
+                print(f"Command output: {e.stdout}")
+                print(f"Command errors: {e.stderr}")
+                raise
 
             # Check if the PDF was created
+            print(f"Checking if PDF exists at: {output_pdf_path}")
             if not os.path.exists(output_pdf_path):
+                print(f"PDF not found. Directory contents: {os.listdir(tempdir)}")
                 raise FileNotFoundError(f"PDF was not created at {output_pdf_path}")
 
             # Read the PDF file into memory
@@ -191,6 +205,7 @@ Resume text:
             pdf_io = io.BytesIO(pdf_data)
             pdf_io.seek(0)
 
+            print("=== PDF Generation Process Completed Successfully ===")
             return send_file(
                 pdf_io,
                 mimetype='application/pdf',
@@ -199,11 +214,13 @@ Resume text:
             )
 
         except subprocess.CalledProcessError as e:
-            print(f"resume-cli error: {e}")
+            print(f"Command error: {e}")
             print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
             return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
         except Exception as e:
             print(f"Unexpected error: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return jsonify({"error": str(e)}), 500
         finally:
             # Clean up the temporary directory

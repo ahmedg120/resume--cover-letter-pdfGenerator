@@ -5,8 +5,8 @@
     "start": "python app.py"
   },
   "dependencies": {
-    "resume-cli": "^3.0.6",
-    "jsonresume-theme-stackoverflow": "^1.0.3",
-    "resume-schema": "^1.0.0"
+    "resume": "^1.0.0",
+    "resume-schema": "^1.0.0",
+    "jsonresume-theme-stackoverflow": "^1.0.3"
   }
 }
