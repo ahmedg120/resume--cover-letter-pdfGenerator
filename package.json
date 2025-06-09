@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "resume-cli": "^3.0.6",
-    "jsonresume-theme-stackoverflow": "^1.0.3"
+    "jsonresume-theme-stackoverflow": "^1.0.3",
+    "resume-schema": "^1.0.0"
   }
 }

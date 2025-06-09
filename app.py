@@ -155,19 +155,22 @@ Resume text:
             output_pdf_path = os.path.join(tempdir, "resume.pdf")
             print(f"Will save PDF to: {output_pdf_path}")
 
-            # Use local node_modules for resume-cli
-            npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume")
+            # Change to the app directory where node_modules is located
+            os.chdir(os.path.dirname(os.path.abspath(__file__)))
+            print(f"Changed to directory: {os.getcwd()}")
+
+            # Use npx directly
+            npx_cmd = "npx"
             if platform.system() == "Windows":
-                npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume.cmd")
-            
-            print(f"Using resume-cli from: {npx_cmd}")
-            print(f"Current working directory: {os.getcwd()}")
-            print(f"Directory contents: {os.listdir(os.getcwd())}")
-            print(f"node_modules contents: {os.listdir(os.path.join(os.getcwd(), 'node_modules', '.bin'))}")
+                npx_cmd = "npx.cmd"
+
+            print(f"Using npx command: {npx_cmd}")
+            print(f"Directory contents: {os.listdir('.')}")
+            print(f"node_modules exists: {os.path.exists('node_modules')}")
 
             # Run the resume-cli command
             result = subprocess.run([
-                npx_cmd, "export", output_pdf_path,
+                npx_cmd, "resume-cli", "export", output_pdf_path,
                 "--resume", resume_json_path,
                 "--theme", "jsonresume-theme-stackoverflow"
             ], capture_output=True, text=True, check=True)
