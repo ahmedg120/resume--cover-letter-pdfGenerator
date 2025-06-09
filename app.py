@@ -143,7 +143,8 @@ Resume text:
         json_resume = json.loads(response.choices[0].message.content)
 
         # Step 4: Generate PDF with `npx resume export`
-        with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = tempfile.mkdtemp()
+        try:
             resume_json_path = os.path.join(tempdir, "resume.json")
             with open(resume_json_path, "w") as f:
                 json.dump(json_resume, f, indent=2)
@@ -164,19 +165,23 @@ Resume text:
             with open(output_pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
 
+            # Create a BytesIO object to send the PDF
+            pdf_io = io.BytesIO(pdf_data)
+            pdf_io.seek(0)
+
+            return send_file(
+                pdf_io,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name='resume.pdf'
+            )
+
+        finally:
             # Clean up the temporary directory
-            shutil.rmtree(tempdir)
-
-        # Create a BytesIO object to send the PDF
-        pdf_io = io.BytesIO(pdf_data)
-        pdf_io.seek(0)
-
-        return send_file(
-            pdf_io,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name='resume.pdf'
-        )
+            try:
+                shutil.rmtree(tempdir)
+            except Exception as e:
+                print(f"Error cleaning up temporary directory: {e}")
 
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
