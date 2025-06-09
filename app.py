@@ -155,50 +155,56 @@ Resume text:
             output_pdf_path = os.path.join(tempdir, "resume.pdf")
             print(f"Will save PDF to: {output_pdf_path}")
 
-            # Use local node_modules for resume-cli
-            npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume")
-            if platform.system() == "Windows":
-                npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume.cmd")
+            # Use npx directly
+            npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
             
-            print(f"Using resume-cli from: {npx_cmd}")
+            print(f"Using command: {npx_cmd}")
             print(f"Current working directory: {os.getcwd()}")
-            print(f"Directory contents: {os.listdir(os.getcwd())}")
-            print(f"node_modules contents: {os.listdir(os.path.join(os.getcwd(), 'node_modules', '.bin'))}")
-
-            # Run the resume-cli command
-            result = subprocess.run([
-                npx_cmd, "export", output_pdf_path,
-                "--resume", resume_json_path,
-                "--theme", "jsonresume-theme-stackoverflow"
-            ], capture_output=True, text=True, check=True)
             
-            print(f"resume-cli output: {result.stdout}")
-            print(f"resume-cli errors: {result.stderr}")
+            # Run the resume-cli command
+            print("Attempting to run resume-cli command...")
+            print(f"Command: {npx_cmd} resume export {output_pdf_path} --resume {resume_json_path} --theme jsonresume-theme-stackoverflow")
+            
+            try:
+                # First ensure resume-cli is installed globally
+                subprocess.run([npx_cmd, "resume", "install"], check=True)
+                
+                # Then run the export command
+                result = subprocess.run([
+                    npx_cmd, "resume", "export", output_pdf_path,
+                    "--resume", resume_json_path,
+                    "--theme", "jsonresume-theme-stackoverflow"
+                ], capture_output=True, text=True, check=True)
+                
+                print(f"resume-cli output: {result.stdout}")
+                print(f"resume-cli errors: {result.stderr}")
 
-            # Check if the PDF was created
-            if not os.path.exists(output_pdf_path):
-                raise FileNotFoundError(f"PDF was not created at {output_pdf_path}")
+                # Check if the PDF was created
+                if not os.path.exists(output_pdf_path):
+                    raise FileNotFoundError(f"PDF was not created at {output_pdf_path}")
 
-            # Read the PDF file into memory
-            with open(output_pdf_path, 'rb') as pdf_file:
-                pdf_data = pdf_file.read()
-            print(f"Successfully read PDF file, size: {len(pdf_data)} bytes")
+                # Read the PDF file into memory
+                with open(output_pdf_path, 'rb') as pdf_file:
+                    pdf_data = pdf_file.read()
+                print(f"Successfully read PDF file, size: {len(pdf_data)} bytes")
 
-            # Create a BytesIO object to send the PDF
-            pdf_io = io.BytesIO(pdf_data)
-            pdf_io.seek(0)
+                # Create a BytesIO object to send the PDF
+                pdf_io = io.BytesIO(pdf_data)
+                pdf_io.seek(0)
 
-            return send_file(
-                pdf_io,
-                mimetype='application/pdf',
-                as_attachment=True,
-                download_name='resume.pdf'
-            )
+                return send_file(
+                    pdf_io,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name='resume.pdf'
+                )
 
-        except subprocess.CalledProcessError as e:
-            print(f"resume-cli error: {e}")
-            print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
-            return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
+            except subprocess.CalledProcessError as e:
+                print(f"resume-cli error: {e}")
+                print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
+                print(f"Command stderr: {e.stderr if hasattr(e, 'stderr') else 'No stderr'}")
+                raise
+
         except Exception as e:
             print(f"Unexpected error: {str(e)}")
             return jsonify({"error": str(e)}), 500

@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
+# Install resume-cli globally
+RUN npm install -g resume-cli jsonresume-theme-stackoverflow
+
 # Copy package.json first for better caching
 COPY package.json .
 RUN npm install
