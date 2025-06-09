@@ -145,26 +145,44 @@ Resume text:
         # Step 4: Generate PDF with `npx resume export`
         tempdir = tempfile.mkdtemp()
         try:
+            print(f"Created temporary directory: {tempdir}")
+            
             resume_json_path = os.path.join(tempdir, "resume.json")
             with open(resume_json_path, "w") as f:
                 json.dump(json_resume, f, indent=2)
+            print(f"Created JSON file at: {resume_json_path}")
 
             output_pdf_path = os.path.join(tempdir, "resume.pdf")
+            print(f"Will save PDF to: {output_pdf_path}")
 
             # Use local node_modules for resume-cli
             npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume")
             if platform.system() == "Windows":
                 npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume.cmd")
+            
+            print(f"Using resume-cli from: {npx_cmd}")
+            print(f"Current working directory: {os.getcwd()}")
+            print(f"Directory contents: {os.listdir(os.getcwd())}")
+            print(f"node_modules contents: {os.listdir(os.path.join(os.getcwd(), 'node_modules', '.bin'))}")
 
-            subprocess.run([
+            # Run the resume-cli command
+            result = subprocess.run([
                 npx_cmd, "export", output_pdf_path,
                 "--resume", resume_json_path,
                 "--theme", "jsonresume-theme-stackoverflow"
-            ], check=True)
+            ], capture_output=True, text=True, check=True)
+            
+            print(f"resume-cli output: {result.stdout}")
+            print(f"resume-cli errors: {result.stderr}")
+
+            # Check if the PDF was created
+            if not os.path.exists(output_pdf_path):
+                raise FileNotFoundError(f"PDF was not created at {output_pdf_path}")
 
             # Read the PDF file into memory
             with open(output_pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
+            print(f"Successfully read PDF file, size: {len(pdf_data)} bytes")
 
             # Create a BytesIO object to send the PDF
             pdf_io = io.BytesIO(pdf_data)
@@ -177,10 +195,18 @@ Resume text:
                 download_name='resume.pdf'
             )
 
+        except subprocess.CalledProcessError as e:
+            print(f"resume-cli error: {e}")
+            print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
+            return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return jsonify({"error": str(e)}), 500
         finally:
             # Clean up the temporary directory
             try:
                 shutil.rmtree(tempdir)
+                print(f"Cleaned up temporary directory: {tempdir}")
             except Exception as e:
                 print(f"Error cleaning up temporary directory: {e}")
 
