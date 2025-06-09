@@ -133,6 +133,7 @@ Resume text:
 {resume_text}
 """
 
+
         response = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": prompt}],
@@ -142,84 +143,51 @@ Resume text:
 
         json_resume = json.loads(response.choices[0].message.content)
 
-        # Step 4: Generate PDF with `npx resume export`
+        # Create a temporary directory
         tempdir = tempfile.mkdtemp()
-        try:
-            print(f"Created temporary directory: {tempdir}")
-            
-            resume_json_path = os.path.join(tempdir, "resume.json")
-            with open(resume_json_path, "w") as f:
-                json.dump(json_resume, f, indent=2)
-            print(f"Created JSON file at: {resume_json_path}")
+        resume_json_path = os.path.join(tempdir, "resume.json")
+        output_pdf_path = os.path.join(tempdir, "resume.pdf")
 
-            output_pdf_path = os.path.join(tempdir, "resume.pdf")
-            print(f"Will save PDF to: {output_pdf_path}")
+        with open(resume_json_path, "w") as f:
+            json.dump(json_resume, f, indent=2)
 
-            # Use npx directly
-            npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
-            
-            print(f"Using command: {npx_cmd}")
-            print(f"Current working directory: {os.getcwd()}")
-            
-            # Run the resume-cli command
-            print("Attempting to run resume-cli command...")
-            print(f"Command: {npx_cmd} resume export {output_pdf_path} --resume {resume_json_path} --theme jsonresume-theme-stackoverflow")
-            
-            try:
-                # First ensure resume-cli is installed globally
-                subprocess.run([npx_cmd, "resume", "install"], check=True)
-                
-                # Then run the export command
-                result = subprocess.run([
-                    npx_cmd, "resume", "export", output_pdf_path,
-                    "--resume", resume_json_path,
-                    "--theme", "jsonresume-theme-stackoverflow"
-                ], capture_output=True, text=True, check=True)
-                
-                print(f"resume-cli output: {result.stdout}")
-                print(f"resume-cli errors: {result.stderr}")
+        npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
 
-                # Check if the PDF was created
-                if not os.path.exists(output_pdf_path):
-                    raise FileNotFoundError(f"PDF was not created at {output_pdf_path}")
+        # Export resume to PDF
+        result = subprocess.run([
+            npx_cmd, "resume", "export", output_pdf_path,
+            "--resume", resume_json_path,
+            "--theme", "jsonresume-theme-stackoverflow"
+        ], capture_output=True, text=True)
 
-                # Read the PDF file into memory
-                with open(output_pdf_path, 'rb') as pdf_file:
-                    pdf_data = pdf_file.read()
-                print(f"Successfully read PDF file, size: {len(pdf_data)} bytes")
+        if result.returncode != 0:
+            raise RuntimeError(f"resume-cli failed: {result.stderr}")
 
-                # Create a BytesIO object to send the PDF
-                pdf_io = io.BytesIO(pdf_data)
-                pdf_io.seek(0)
+        if not os.path.exists(output_pdf_path):
+            raise FileNotFoundError("PDF was not created.")
 
-                return send_file(
-                    pdf_io,
-                    mimetype='application/pdf',
-                    as_attachment=True,
-                    download_name='resume.pdf'
-                )
+        # Return PDF
+        with open(output_pdf_path, 'rb') as f:
+            pdf_data = f.read()
+        pdf_io = io.BytesIO(pdf_data)
+        pdf_io.seek(0)
 
-            except subprocess.CalledProcessError as e:
-                print(f"resume-cli error: {e}")
-                print(f"Command output: {e.output if hasattr(e, 'output') else 'No output'}")
-                print(f"Command stderr: {e.stderr if hasattr(e, 'stderr') else 'No stderr'}")
-                raise
+        return send_file(
+            pdf_io,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='resume.pdf'
+        )
 
-        except Exception as e:
-            print(f"Unexpected error: {str(e)}")
-            return jsonify({"error": str(e)}), 500
-        finally:
-            # Clean up the temporary directory
-            try:
-                shutil.rmtree(tempdir)
-                print(f"Cleaned up temporary directory: {tempdir}")
-            except Exception as e:
-                print(f"Error cleaning up temporary directory: {e}")
-
-    except subprocess.CalledProcessError as e:
-        return jsonify({"error": f"Resume export failed: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            shutil.rmtree(app.config['UPLOAD_FOLDER'], ignore_errors=True)
+            if 'tempdir' in locals():
+                shutil.rmtree(tempdir, ignore_errors=True)
+        except Exception as e:
+            print(f"Error cleaning up temp files: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
