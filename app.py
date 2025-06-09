@@ -151,12 +151,13 @@ Resume text:
 
             output_pdf_path = os.path.join(tempdir, "resume.pdf")
 
-            npx_cmd = "npx"
+            # Use local node_modules for resume-cli
+            npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume")
             if platform.system() == "Windows":
-                npx_cmd = "C:\\Program Files\\nodejs\\npx.cmd"
+                npx_cmd = os.path.join(os.getcwd(), "node_modules", ".bin", "resume.cmd")
 
             subprocess.run([
-                npx_cmd, "resume", "export", output_pdf_path,
+                npx_cmd, "export", output_pdf_path,
                 "--resume", resume_json_path,
                 "--theme", "jsonresume-theme-stackoverflow"
             ], check=True)

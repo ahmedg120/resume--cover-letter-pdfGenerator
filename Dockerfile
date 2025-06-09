@@ -8,12 +8,13 @@ RUN apt-get update && apt-get install -y \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy package.json first for better caching
+COPY package.json .
+RUN npm install
+
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Install resume-cli globally
-RUN npm install -g resume-cli jsonresume-theme-stackoverflow
 
 # Copy the rest of the application
 COPY . .
